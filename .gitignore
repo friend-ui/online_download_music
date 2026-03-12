@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+venv/
+.env
+fastapi/downloads/
+musicdl_outputs/
+.idea/
+.vscode/

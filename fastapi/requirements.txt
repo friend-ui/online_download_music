@@ -28,3 +28,4 @@ platformdirs
 lxml
 prompt_toolkit
 nodejs-wheel
+a2wsgi

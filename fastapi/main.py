@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from a2wsgi import ASGIMiddleware
 
 # Add musicdl to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../musicdl')))
@@ -39,9 +40,10 @@ app.add_middleware(
 
 # Initialize MusicClient
 # Set proxy if needed
-PROXIES = {"http": "http://localhost:7890", "https": "http://localhost:7890"}
+proxy = os.environ.get("HTTP_PROXY")
+PROXIES = {"http": proxy, "https": proxy} if proxy else None
 SOURCES = ['MiguMusicClient', 'NeteaseMusicClient', 'QQMusicClient', 'KuwoMusicClient', 'QianqianMusicClient', 'KugouMusicClient']
-REQUESTS_OVERRIDES = {source: {"proxies": PROXIES} for source in SOURCES}
+REQUESTS_OVERRIDES = {source: {"proxies": PROXIES} for source in SOURCES} if proxy else {}
 
 # Initialize client globally
 client = MusicClient(music_sources=SOURCES, requests_overrides=REQUESTS_OVERRIDES)
@@ -49,6 +51,10 @@ client = MusicClient(music_sources=SOURCES, requests_overrides=REQUESTS_OVERRIDE
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 if not os.path.exists(DOWNLOAD_DIR):
     os.makedirs(DOWNLOAD_DIR)
+
+# WSGI app for PythonAnywhere
+application = ASGIMiddleware(app)
+
 
 class SearchRequest(BaseModel):
     keyword: str
