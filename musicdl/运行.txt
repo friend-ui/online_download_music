@@ -1,0 +1,4 @@
+进入虚拟环境，打开pycharm
+运行
+cd examples/musicdlgui
+python musicdlgui.py，直接运行
