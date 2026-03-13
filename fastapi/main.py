@@ -58,6 +58,7 @@ application = ASGIMiddleware(app)
 
 class SearchRequest(BaseModel):
     keyword: str
+    source: str = "all"
 
 @app.get("/")
 async def read_root():
@@ -67,27 +68,28 @@ async def read_root():
 async def search(request: SearchRequest):
     try:
         keyword = request.keyword
-        # Call musicdl search
-        # search returns a dict: {source: [song_info_dict, ...]}
-        # Note: client.search returns list of SongInfo objects in recent versions?
-        # Let's check the code again.
-        # MusicClient.search returns a dict from ThreadPoolExecutor map if run in parallel,
-        # BUT wait, the MusicClient.search method in musicdl.py:
-        # returns dict(ex.map(search_func, self.music_sources))
-        # where search_func returns (ms, results_list)
-        # So it returns {source: [SongInfo, ...]}
+        source = request.source
         
-        raw_results = client.search(keyword)
+        # Determine sources to use
+        if source == "all" or source not in SOURCES:
+            search_sources = SOURCES
+            current_client = client
+        else:
+            search_sources = [source]
+            # Create a new client for specific source to avoid waiting for others
+            # Or use the global client if we don't mind
+            # For better performance on single source search, a new client is better 
+            # as it won't spawn threads for other sources.
+            current_client = MusicClient(music_sources=search_sources, requests_overrides=REQUESTS_OVERRIDES)
+
+        raw_results = current_client.search(keyword)
         
         results = []
-        for source, song_infos in raw_results.items():
+        for src, song_infos in raw_results.items():
             for song_info in song_infos:
-                # song_info is a SongInfo object
-                # We need to convert it to dict for JSON response
                 if isinstance(song_info, SongInfo):
                     results.append(song_info.todict())
                 else:
-                    # Fallback if it's already a dict (should not happen based on code read)
                     results.append(song_info)
                     
         return {"results": results}
@@ -103,24 +105,35 @@ async def download(song_info_data: Dict[str, Any]):
         
         # Override work_dir to our download directory
         song_info.work_dir = DOWNLOAD_DIR
-        # Reset _save_path to ensure it recalculates based on new work_dir
-        song_info._save_path = None
         
-        # Download
-        # client.download expects a list of dicts or SongInfo objects?
-        # The signature says list[dict] in type hint, but code uses SongInfo object attributes.
-        # Let's check musicdl.py again.
-        # download(self, song_infos: list[dict]) -> calls self.music_clients[source].download
-        # BaseMusicClient.download takes list[SongInfo]
-        # So we should pass a list of SongInfo objects.
+        # Custom filename: SongName(Singers).ext
+        # Sanitize filename components
+        def sanitize(name):
+            return "".join([c for c in name if c.isalnum() or c in (' ', '-', '_', '.', '(', ')', '[', ']')]).strip()
         
-        client.download([song_info])
+        song_name = sanitize(song_info.song_name or "Unknown")
+        singers = sanitize(song_info.singers or "Unknown")
+        ext = (song_info.ext or "mp3").lstrip('.')
         
-        file_path = song_info.save_path
+        filename = f"{song_name}({singers}).{ext}"
+        save_path = os.path.join(DOWNLOAD_DIR, filename)
         
-        if os.path.exists(file_path):
-            filename = os.path.basename(file_path)
-            return FileResponse(file_path, filename=filename, media_type='application/octet-stream')
+        # Check if file already exists
+        if not os.path.exists(save_path):
+            # Force set _save_path so musicdl uses it
+            song_info._save_path = save_path
+            # Download
+            client.download([song_info])
+        
+        # Verify file exists (it should now)
+        if os.path.exists(save_path):
+            filename = os.path.basename(save_path)
+            # Use standard FileResponse with filename parameter which handles quoting correctly
+            return FileResponse(
+                save_path, 
+                filename=filename, 
+                media_type='application/octet-stream'
+            )
         else:
             raise HTTPException(status_code=404, detail="File not found after download")
             

@@ -25,7 +25,7 @@
             padding: 10px;
             width: 300px;
             border: 1px solid #ddd;
-            border-radius: 4px 0 0 4px;
+            border-left: none;
             outline: none;
         }
         button#search-btn {
@@ -88,7 +88,16 @@
     <h1>MusicDL 在线下载</h1>
     
     <div class="search-container">
-        <input type="text" id="keyword" placeholder="输入歌曲名或歌手..." onkeypress="if(event.keyCode==13) search()">
+        <select id="source-select" style="padding: 10px; border: 1px solid #ddd; border-right: none; border-radius: 4px 0 0 4px; outline: none; background: white;">
+            <option value="all">所有来源</option>
+            <option value="MiguMusicClient">咪咕音乐</option>
+            <option value="NeteaseMusicClient">网易云音乐</option>
+            <option value="QQMusicClient">QQ音乐</option>
+            <option value="KuwoMusicClient">酷我音乐</option>
+            <option value="QianqianMusicClient">千千音乐</option>
+            <option value="KugouMusicClient">酷狗音乐</option>
+        </select>
+        <input type="text" id="keyword" placeholder="输入歌曲名或歌手..." style="border-radius: 0;" onkeypress="if(event.keyCode==13) search()">
         <button id="search-btn" onclick="search()">搜索</button>
     </div>
 
@@ -117,6 +126,7 @@
 
         async function search() {
             const keyword = document.getElementById('keyword').value.trim();
+            const source = document.getElementById('source-select').value;
             if (!keyword) return;
 
             const tbody = document.getElementById('results-body');
@@ -132,7 +142,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ keyword })
+                    body: JSON.stringify({ keyword, source })
                 });
 
                 if (!response.ok) {
@@ -225,9 +235,19 @@
                 let filename = `${songInfo.song_name}.${songInfo.ext || 'mp3'}`;
                 const disposition = response.headers.get('Content-Disposition');
                 if (disposition && disposition.includes('attachment')) {
-                    const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-                    if (matches != null && matches[1]) { 
-                        filename = matches[1].replace(/['"]/g, '');
+                    // Try filename* first (RFC 5987)
+                    // Matches filename*=utf-8''... ending with ; or end of string
+                    let filenameRegex = /filename\*=utf-8''([^;]+)(?:; ?|$)/i;
+                    let matches = filenameRegex.exec(disposition);
+                    if (matches && matches[1]) {
+                        filename = decodeURIComponent(matches[1]);
+                    } else {
+                        // Fallback to standard filename
+                        filenameRegex = /filename=(["']?)(.*)\1(?:; ?|$)/i;
+                        matches = filenameRegex.exec(disposition);
+                        if (matches && matches[2]) {
+                            filename = matches[2];
+                        }
                     }
                 }
 
