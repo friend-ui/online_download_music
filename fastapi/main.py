@@ -4,7 +4,7 @@ import shutil
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from a2wsgi import ASGIMiddleware
@@ -42,10 +42,18 @@ app.add_middleware(
 # Set proxy if needed
 proxy = os.environ.get("HTTP_PROXY")
 PROXIES = {"http": proxy, "https": proxy} if proxy else None
-SOURCES = ['MiguMusicClient', 'NeteaseMusicClient', 'QQMusicClient', 'KuwoMusicClient', 'QianqianMusicClient', 'KugouMusicClient']
+SOURCES = [
+    'BilibiliMusicClient', 'FiveSingMusicClient', 'KugouMusicClient', 'KuwoMusicClient', 
+    'MiguMusicClient', 'NeteaseMusicClient', 'SodaMusicClient'
+]
 REQUESTS_OVERRIDES = {source: {"proxies": PROXIES} for source in SOURCES} if proxy else {}
 
 # Initialize client globally
+# Note: KKWSMusicClient is removed because it requires quark_parser_config which is not set by default.
+# Note: TIDALMusicClient is removed because it requires default_cookies which is not set by default.
+# Note: FLMP3MusicClient is removed because it requires quark_parser_config which is not set by default.
+# Note: FiveSongMusicClient is removed because it requires quark_parser_config which is not set by default.
+# If you want to enable them, you need to provide necessary configs in init_music_clients_cfg.
 client = MusicClient(music_sources=SOURCES, requests_overrides=REQUESTS_OVERRIDES)
 
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
@@ -99,6 +107,7 @@ async def search(request: SearchRequest):
 
 @app.post("/api/download")
 async def download(song_info_data: Dict[str, Any]):
+    temp_file_path = None
     try:
         # Reconstruct SongInfo object
         song_info = SongInfo.fromdict(song_info_data)
@@ -128,11 +137,61 @@ async def download(song_info_data: Dict[str, Any]):
         # Verify file exists (it should now)
         if os.path.exists(save_path):
             filename = os.path.basename(save_path)
-            # Use standard FileResponse with filename parameter which handles quoting correctly
-            return FileResponse(
-                save_path, 
-                filename=filename, 
-                media_type='application/octet-stream'
+            
+            # Get file size for progress tracking
+            file_size = os.path.getsize(save_path)
+            
+            # Create custom streaming response that deletes file after transmission
+            async def file_stream():
+                try:
+                    with open(save_path, 'rb') as file:
+                        while True:
+                            chunk = file.read(8192)  # 8KB chunks
+                            if not chunk:
+                                break
+                            yield chunk
+                finally:
+                    # Delete file after streaming completes
+                    if os.path.exists(save_path):
+                        try:
+                            os.remove(save_path)
+                            print(f"Cleaned up temporary file: {save_path}")
+                        except Exception as cleanup_error:
+                            print(f"Error cleaning up file {save_path}: {cleanup_error}")
+                    
+                    # Clean up musicdl_outputs directory
+                    musicdl_outputs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'musicdl_outputs')
+                    if os.path.exists(musicdl_outputs_dir):
+                        try:
+                            import shutil
+                            shutil.rmtree(musicdl_outputs_dir)
+                            print(f"Cleaned up musicdl_outputs directory: {musicdl_outputs_dir}")
+                        except Exception as cleanup_error:
+                            print(f"Error cleaning up musicdl_outputs directory: {cleanup_error}")
+                    
+                    # Clean up downloads directory
+                    downloads_dir = os.path.join(os.path.dirname(__file__), 'downloads')
+                    if os.path.exists(downloads_dir):
+                        try:
+                            import shutil
+                            shutil.rmtree(downloads_dir)
+                            print(f"Cleaned up downloads directory: {downloads_dir}")
+                        except Exception as cleanup_error:
+                            print(f"Error cleaning up downloads directory: {cleanup_error}")
+            
+            # Return streaming response
+            # Properly encode filename for Content-Disposition header (RFC 5987)
+            import urllib.parse
+            encoded_filename = urllib.parse.quote(filename, encoding='utf-8')
+            content_disposition = f"attachment; filename*=UTF-8''{encoded_filename}"
+            
+            return StreamingResponse(
+                file_stream(),
+                media_type='application/octet-stream',
+                headers={
+                    'Content-Disposition': content_disposition,
+                    'Content-Length': str(file_size)
+                }
             )
         else:
             raise HTTPException(status_code=404, detail="File not found after download")

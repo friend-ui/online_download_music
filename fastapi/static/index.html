@@ -81,6 +81,117 @@
             text-align: center;
             padding: 20px;
             color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        /* 微软风格的旋转加载动画 */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #0078d4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 16px;
+            color: #666;
+        }
+        
+        /* 下载进度条对话框 */
+        .download-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .download-dialog {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 400px;
+            text-align: center;
+        }
+        
+        .download-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .download-info {
+            margin-bottom: 15px;
+            color: #666;
+        }
+        
+        .progress-container {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .download-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .status-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+            white-space: pre-line;
+            line-height: 1.4;
+            text-align: center;
+        }
+        
+        .cancel-btn {
+            padding: 8px 16px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .cancel-btn:hover {
+            background-color: #5a6268;
         }
     </style>
 </head>
@@ -89,13 +200,15 @@
     
     <div class="search-container">
         <select id="source-select" style="padding: 10px; border: 1px solid #ddd; border-right: none; border-radius: 4px 0 0 4px; outline: none; background: white;">
-            <option value="all">所有来源</option>
-            <option value="MiguMusicClient">咪咕音乐</option>
-            <option value="NeteaseMusicClient">网易云音乐</option>
-            <option value="QQMusicClient">QQ音乐</option>
-            <option value="KuwoMusicClient">酷我音乐</option>
-            <option value="QianqianMusicClient">千千音乐</option>
-            <option value="KugouMusicClient">酷狗音乐</option>
+            <optgroup label="大中华区平台">
+                <option value="NeteaseMusicClient" selected>网易云音乐</option>
+                <option value="KugouMusicClient">酷狗音乐</option>
+                <option value="SodaMusicClient">汽水音乐</option>
+                <option value="BilibiliMusicClient">Bilibili音乐</option>
+                <option value="FiveSingMusicClient">5SING音乐</option>
+                <option value="KuwoMusicClient">酷我音乐</option>
+                <option value="MiguMusicClient">咪咕音乐</option>
+            </optgroup>
         </select>
         <input type="text" id="keyword" placeholder="输入歌曲名或歌手..." style="border-radius: 0;" onkeypress="if(event.keyCode==13) search()">
         <button id="search-btn" onclick="search()">搜索</button>
@@ -108,6 +221,7 @@
                     <th>歌曲名</th>
                     <th>歌手</th>
                     <th>专辑</th>
+                    <th>大小</th>
                     <th>时长</th>
                     <th>来源</th>
                     <th>操作</th>
@@ -118,7 +232,26 @@
             </tbody>
         </table>
     </div>
-    <div id="loading" class="loading" style="display: none;">搜索中...</div>
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <span class="loading-text">搜索中</span>
+    </div>
+    
+    <!-- 下载进度条对话框 -->
+    <div id="download-modal" class="download-modal">
+        <div class="download-dialog">
+            <div class="download-title">正在下载</div>
+            <div class="download-info" id="download-filename">文件名展示</div>
+            <div class="progress-container">
+                <div class="progress-bar" id="download-progress-bar"></div>
+            </div>
+            <div class="progress-text" id="download-progress-text">0%</div>
+            <div class="status-info" id="download-status">服务端正在解析歌曲数据</div>
+            <div class="download-buttons">
+                <button class="cancel-btn" id="download-cancel-btn">取消</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const API_BASE = '/api';
@@ -133,8 +266,7 @@
             const loading = document.getElementById('loading');
             
             tbody.innerHTML = '';
-            loading.style.display = 'block';
-            loading.textContent = '搜索中...';
+            loading.style.display = 'flex'; // 使用flex布局确保居中显示
 
             try {
                 const response = await fetch(`${API_BASE}/search`, {
@@ -175,7 +307,7 @@
 
             if (currentResults.length === 0) {
                 const tr = document.createElement('tr');
-                tr.innerHTML = '<td colspan="6" style="text-align:center">未找到相关歌曲</td>';
+                tr.innerHTML = '<td colspan="7" style="text-align:center">未找到相关歌曲</td>';
                 tbody.appendChild(tr);
                 return;
             }
@@ -186,6 +318,7 @@
                 const name = song.song_name || '-';
                 const singer = song.singers || '-';
                 const album = song.album || '-';
+                const fileSize = song.file_size || '-';
                 const duration = song.duration || '-';
                 const source = song.source || '-';
                 
@@ -193,6 +326,7 @@
                     <td>${name}</td>
                     <td>${singer}</td>
                     <td>${album}</td>
+                    <td>${fileSize}</td>
                     <td>${duration}</td>
                     <td>${source}</td>
                     <td><button class="download-btn" data-index="${index}">下载</button></td>
@@ -209,6 +343,58 @@
             });
         }
 
+        let downloadController = null;
+        
+        // 显示下载进度条
+        function showDownloadModal(filename) {
+            const modal = document.getElementById('download-modal');
+            const filenameEl = document.getElementById('download-filename');
+            const progressBar = document.getElementById('download-progress-bar');
+            const progressText = document.getElementById('download-progress-text');
+            const statusEl = document.getElementById('download-status');
+            
+            filenameEl.textContent = filename;
+            progressBar.style.width = '0%';
+            progressText.textContent = '0%';
+            statusEl.textContent = '服务端正在解析歌曲数据\n解析大小较大歌曲需要一定时间，耐心等待\n解析完成将会开始下载';
+            statusEl.style.display = 'block';
+            modal.style.display = 'flex';
+        }
+        
+        // 隐藏下载进度条
+        function hideDownloadModal() {
+            const modal = document.getElementById('download-modal');
+            modal.style.display = 'none';
+        }
+        
+        // 更新进度条
+        function updateProgress(loaded, total) {
+            const progressBar = document.getElementById('download-progress-bar');
+            const progressText = document.getElementById('download-progress-text');
+            const statusEl = document.getElementById('download-status');
+            
+            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+            progressBar.style.width = percent + '%';
+            progressText.textContent = percent + '%';
+            
+            // 如果开始下载了，隐藏状态提示
+            if (loaded > 0) {
+                statusEl.style.display = 'none';
+            }
+        }
+        
+        // 下载取消
+        function cancelDownload() {
+            if (downloadController) {
+                downloadController.abort();
+                downloadController = null;
+            }
+            hideDownloadModal();
+        }
+        
+        // 为取消按钮添加事件监听
+        document.getElementById('download-cancel-btn').addEventListener('click', cancelDownload);
+        
         async function downloadSong(index, btn) {
             const songInfo = currentResults[index];
             if (!songInfo) return;
@@ -218,12 +404,20 @@
             btn.textContent = '下载中...';
 
             try {
+                // 显示下载进度条对话框
+                let filename = `${songInfo.song_name}.${songInfo.ext || 'mp3'}`;
+                showDownloadModal(filename);
+                
+                // 创建下载控制器
+                downloadController = new AbortController();
+                
                 const response = await fetch(`${API_BASE}/download`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(songInfo)
+                    body: JSON.stringify(songInfo),
+                    signal: downloadController.signal
                 });
 
                 if (!response.ok) {
@@ -231,18 +425,18 @@
                     throw new Error(errorData.detail || 'Download failed');
                 }
 
-                // Get filename from header if possible
-                let filename = `${songInfo.song_name}.${songInfo.ext || 'mp3'}`;
+                // 获取文件大小和文件名
+                const contentLength = response.headers.get('Content-Length');
+                const total = parseInt(contentLength, 10) || 0;
+                
+                // 从头部获取文件名
                 const disposition = response.headers.get('Content-Disposition');
                 if (disposition && disposition.includes('attachment')) {
-                    // Try filename* first (RFC 5987)
-                    // Matches filename*=utf-8''... ending with ; or end of string
                     let filenameRegex = /filename\*=utf-8''([^;]+)(?:; ?|$)/i;
                     let matches = filenameRegex.exec(disposition);
                     if (matches && matches[1]) {
                         filename = decodeURIComponent(matches[1]);
                     } else {
-                        // Fallback to standard filename
                         filenameRegex = /filename=(["']?)(.*)\1(?:; ?|$)/i;
                         matches = filenameRegex.exec(disposition);
                         if (matches && matches[2]) {
@@ -250,8 +444,50 @@
                         }
                     }
                 }
-
-                const blob = await response.blob();
+                
+                // 更新文件名显示
+                document.getElementById('download-filename').textContent = filename;
+                
+                // 如果没有文件大小信息，则使用伪进度条
+                if (total === 0) {
+                    // 使用伪进度条：从0到100%，每隔一定时间增加一定进度
+                    let fakeProgress = 0;
+                    const fakeInterval = setInterval(() => {
+                        fakeProgress += 5;
+                        if (fakeProgress >= 95) {
+                            clearInterval(fakeInterval);
+                        }
+                        updateProgress(fakeProgress, 100);
+                    }, 200);
+                }
+                
+                // 读取数据并跟踪进度
+                const reader = response.body.getReader();
+                let loaded = 0;
+                const chunks = [];
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    loaded += value.length;
+                    chunks.push(value);
+                    
+                    // 更新进度条（如果有真实的文件大小）
+                    if (total > 0) {
+                        updateProgress(loaded, total);
+                    }
+                }
+                
+                // 完成下载，设置进度为100%
+                updateProgress(total > 0 ? total : 100, total > 0 ? total : 100);
+                
+                // 等待一点时间让用户看到完成
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 创建文件并下载
+                const blob = new Blob(chunks);
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -260,12 +496,20 @@
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
+                
+                // 隐藏进度条
+                hideDownloadModal();
+                
             } catch (error) {
                 console.error(error);
-                alert('下载失败: ' + error.message);
+                if (error.name !== 'AbortError') {
+                    alert('下载失败: ' + error.message);
+                }
+                hideDownloadModal();
             } finally {
                 btn.disabled = false;
                 btn.textContent = originalText;
+                downloadController = null;
             }
         }
     </script>
