@@ -189,9 +189,17 @@ async def download(song_info_data: Dict[str, Any]):
             song_info._save_path = save_path
             # Download
             client.download([song_info])
+            
+            # Wait a moment for the file to be fully written
+            import time
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                if os.path.exists(save_path) and os.path.getsize(save_path) > 0:
+                    break
+                time.sleep(0.5)  # Wait 500ms between checks
         
-        # Verify file exists (it should now)
-        if os.path.exists(save_path):
+        # Verify file exists and has content
+        if os.path.exists(save_path) and os.path.getsize(save_path) > 0:
             filename = os.path.basename(save_path)
             
             # Get file size for progress tracking
@@ -199,14 +207,19 @@ async def download(song_info_data: Dict[str, Any]):
             
             # Create custom streaming response that deletes file after transmission
             async def file_stream():
+                file_handle = None
                 try:
-                    with open(save_path, 'rb') as file:
-                        while True:
-                            chunk = file.read(8192)  # 8KB chunks
-                            if not chunk:
-                                break
-                            yield chunk
+                    file_handle = open(save_path, 'rb')
+                    while True:
+                        chunk = file_handle.read(8192)  # 8KB chunks
+                        if not chunk:
+                            break
+                        yield chunk
                 finally:
+                    # Close file handle first
+                    if file_handle:
+                        file_handle.close()
+                    
                     # Delete file after streaming completes
                     if os.path.exists(save_path):
                         try:
@@ -215,21 +228,21 @@ async def download(song_info_data: Dict[str, Any]):
                         except Exception as cleanup_error:
                             print(f"Error cleaning up file {save_path}: {cleanup_error}")
                     
-                    # Clean up musicdl_outputs directory
+                    # Clean up musicdl_outputs directory (force clean all contents)
                     musicdl_outputs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'musicdl_outputs')
                     if os.path.exists(musicdl_outputs_dir):
                         try:
-                            import shutil
+                            # Remove entire directory and all contents
                             shutil.rmtree(musicdl_outputs_dir)
                             print(f"Cleaned up musicdl_outputs directory: {musicdl_outputs_dir}")
                         except Exception as cleanup_error:
                             print(f"Error cleaning up musicdl_outputs directory: {cleanup_error}")
                     
-                    # Clean up downloads directory
+                    # Clean up downloads directory (force clean all contents)
                     downloads_dir = os.path.join(os.path.dirname(__file__), 'downloads')
                     if os.path.exists(downloads_dir):
                         try:
-                            import shutil
+                            # Remove entire directory and all contents
                             shutil.rmtree(downloads_dir)
                             print(f"Cleaned up downloads directory: {downloads_dir}")
                         except Exception as cleanup_error:
