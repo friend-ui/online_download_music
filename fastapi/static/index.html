@@ -49,6 +49,23 @@
             width: 100%;
             border-collapse: collapse;
         }
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 20px;
+        }
+        th.sortable:hover {
+            background-color: #f0f0f0;
+        }
+        .sort-arrow {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            color: #007bff;
+        }
         th, td {
             padding: 12px;
             text-align: left;
@@ -200,8 +217,9 @@
     
     <div class="search-container">
         <select id="source-select" style="padding: 10px; border: 1px solid #ddd; border-right: none; border-radius: 4px 0 0 4px; outline: none; background: white;">
+            <option value="all" selected>所有平台</option>
             <optgroup label="大中华区平台">
-                <option value="NeteaseMusicClient" selected>网易云音乐</option>
+                <option value="NeteaseMusicClient">网易云音乐</option>
                 <option value="KugouMusicClient">酷狗音乐</option>
                 <option value="SodaMusicClient">汽水音乐</option>
                 <option value="BilibiliMusicClient">Bilibili音乐</option>
@@ -218,12 +236,12 @@
         <table id="results-table">
             <thead>
                 <tr>
-                    <th>歌曲名</th>
-                    <th>歌手</th>
-                    <th>专辑</th>
-                    <th>大小</th>
-                    <th>时长</th>
-                    <th>来源</th>
+                    <th class="sortable" data-sort="song_name" data-order="">歌曲名 <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-sort="singers" data-order="">歌手 <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-sort="album" data-order="">专辑 <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-sort="file_size" data-order="asc">大小 <span class="sort-arrow">↑</span></th>
+                    <th class="sortable" data-sort="duration" data-order="">时长 <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-sort="source" data-order="">来源 <span class="sort-arrow"></span></th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -256,6 +274,118 @@
     <script>
         const API_BASE = '/api';
         let currentResults = []; // Store current search results
+        let currentSort = { field: 'file_size', order: 'asc' }; // Current sorting state
+
+        // Sort functions
+        function sortResults(field, order) {
+            if (!currentResults.length) return;
+            
+            const sortedResults = [...currentResults];
+            
+            sortedResults.sort((a, b) => {
+                let valueA = a[field] || '';
+                let valueB = b[field] || '';
+                
+                // Handle size field (e.g., "5.2MB")
+                if (field === 'file_size') {
+                    valueA = parseSizeToBytes(valueA);
+                    valueB = parseSizeToBytes(valueB);
+                }
+                // Handle duration field (e.g., "03:45")
+                else if (field === 'duration') {
+                    valueA = parseDurationToSeconds(valueA);
+                    valueB = parseDurationToSeconds(valueB);
+                }
+                // Handle string fields (song_name, singers, album, source)
+                else if (field === 'song_name' || field === 'singers' || field === 'album' || field === 'source') {
+                    // Use localeCompare for proper string comparison
+                    valueA = (valueA || '').toLowerCase();
+                    valueB = (valueB || '').toLowerCase();
+                }
+                
+                if (valueA < valueB) return order === 'asc' ? -1 : 1;
+                if (valueA > valueB) return order === 'asc' ? 1 : -1;
+                return 0;
+            });
+            
+            return sortedResults;
+        }
+        
+        function parseSizeToBytes(sizeStr) {
+            if (!sizeStr || sizeStr === '-') return 0;
+            
+            const sizeMatch = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMG]?B)$/i);
+            if (!sizeMatch) return 0;
+            
+            const size = parseFloat(sizeMatch[1]);
+            const unit = sizeMatch[2].toUpperCase();
+            
+            switch (unit) {
+                case 'KB': return size * 1024;
+                case 'MB': return size * 1024 * 1024;
+                case 'GB': return size * 1024 * 1024 * 1024;
+                default: return size; // bytes
+            }
+        }
+        
+        function parseDurationToSeconds(durationStr) {
+            if (!durationStr || durationStr === '-') return 0;
+            
+            const parts = durationStr.split(':');
+            if (parts.length === 2) {
+                // MM:SS format
+                return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+            } else if (parts.length === 3) {
+                // HH:MM:SS format
+                return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+            }
+            return 0;
+        }
+        
+        function updateSortUI(field, order) {
+            // Reset all sort indicators
+            document.querySelectorAll('.sortable').forEach(th => {
+                th.setAttribute('data-order', '');
+                th.querySelector('.sort-arrow').textContent = '';
+            });
+            
+            // Update current sort indicator
+            const currentTh = document.querySelector(`.sortable[data-sort="${field}"]`);
+            if (currentTh) {
+                currentTh.setAttribute('data-order', order);
+                currentTh.querySelector('.sort-arrow').textContent = order === 'asc' ? '↑' : '↓';
+            }
+        }
+        
+        function handleSortClick(event) {
+            const th = event.target.closest('.sortable');
+            if (!th) return;
+            
+            const field = th.getAttribute('data-sort');
+            const currentOrder = th.getAttribute('data-order');
+            
+            // Toggle order: asc -> desc -> asc
+            const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+            
+            currentSort = { field, order: newOrder };
+            updateSortUI(field, newOrder);
+            
+            // Re-render results with new sorting
+            const sortedResults = sortResults(field, newOrder);
+            if (sortedResults) {
+                renderResults(sortedResults);
+            }
+        }
+        
+        // Add event listeners for sortable headers
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.sortable').forEach(th => {
+                th.addEventListener('click', handleSortClick);
+            });
+            
+            // Set initial sort state
+            updateSortUI('file_size', 'asc');
+        });
 
         async function search() {
             const keyword = document.getElementById('keyword').value.trim();
@@ -312,7 +442,16 @@
                 return;
             }
 
-            currentResults.forEach((song, index) => {
+            // Apply current sorting
+            let displayResults = currentResults;
+            if (currentSort.field && currentSort.order) {
+                const sorted = sortResults(currentSort.field, currentSort.order);
+                if (sorted) {
+                    displayResults = sorted;
+                }
+            }
+
+            displayResults.forEach((song, index) => {
                 const tr = document.createElement('tr');
                 
                 const name = song.song_name || '-';

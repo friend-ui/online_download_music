@@ -63,6 +63,21 @@ if not os.path.exists(DOWNLOAD_DIR):
 # WSGI app for PythonAnywhere
 application = ASGIMiddleware(app)
 
+def clean_json_serializable(obj):
+    """Recursively clean an object to ensure it's JSON serializable."""
+    if isinstance(obj, dict):
+        return {key: clean_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_json_serializable(item) for item in obj]
+    elif isinstance(obj, bytes):
+        try:
+            return obj.decode('utf-8', errors='ignore')
+        except:
+            return ""
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    else:
+        return str(obj)
 
 class SearchRequest(BaseModel):
     keyword: str
@@ -96,9 +111,31 @@ async def search(request: SearchRequest):
         for src, song_infos in raw_results.items():
             for song_info in song_infos:
                 if isinstance(song_info, SongInfo):
-                    results.append(song_info.todict())
+                    song_dict = song_info.todict()
+                    # Clean up the dictionary to ensure JSON serialization
+                    clean_dict = {}
+                    for key, value in song_dict.items():
+                        if isinstance(value, bytes):
+                            # Convert bytes to string with error handling
+                            try:
+                                clean_dict[key] = value.decode('utf-8', errors='ignore')
+                            except:
+                                clean_dict[key] = ""
+                        elif isinstance(value, (str, int, float, bool, type(None))):
+                            clean_dict[key] = value
+                        elif isinstance(value, (list, dict)):
+                            # Recursively clean nested structures
+                            clean_dict[key] = clean_json_serializable(value)
+                        else:
+                            # Convert other types to string
+                            clean_dict[key] = str(value)
+                    results.append(clean_dict)
                 else:
-                    results.append(song_info)
+                    # Handle non-SongInfo objects
+                    if isinstance(song_info, dict):
+                        results.append(clean_json_serializable(song_info))
+                    else:
+                        results.append(str(song_info))
                     
         return {"results": results}
     except Exception as e:
