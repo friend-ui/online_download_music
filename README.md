@@ -1,8 +1,8 @@
-#介绍
-一个下载歌曲的网页   
-后端框架：python fastapi
-#安装和运行
-ubuntu
+#介绍  
+一个下载歌曲的网页       
+后端框架：python fastapi      
+#安装和运行      
+ubuntu      
 ```
 # 如果没有pip，先安装
 sudo apt update
@@ -16,7 +16,7 @@ pip install -r fastapi/requirements.txt
 python3 fastapi/main.py
 ```
 
-windows
+windows    
 ```
 python -m venv venv
 .\venv\Scripts\activate.bat
