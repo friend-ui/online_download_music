@@ -398,27 +398,64 @@
             tbody.innerHTML = '';
             loading.style.display = 'flex'; // 使用flex布局确保居中显示
 
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 65000); // 65秒超时（比后端60秒稍长）
+
             try {
                 const response = await fetch(`${API_BASE}/search`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ keyword, source })
+                    body: JSON.stringify({ keyword, source }),
+                    signal: controller.signal
                 });
 
+                clearTimeout(timeoutId);
+
                 if (!response.ok) {
-                    throw new Error(`Search failed: ${response.statusText}`);
+                    // Handle specific HTTP status codes
+                    if (response.status === 408) {
+                        throw new Error('搜索超时，请尝试简化搜索关键词或稍后重试');
+                    } else if (response.status === 500) {
+                        throw new Error('服务器内部错误，请稍后重试');
+                    } else {
+                        throw new Error(`搜索失败: ${response.statusText}`);
+                    }
                 }
 
                 const data = await response.json();
                 renderResults(data.results);
             } catch (error) {
+                clearTimeout(timeoutId);
                 console.error(error);
-                alert('搜索失败: ' + error.message);
+                
+                // Handle different error types
+                if (error.name === 'AbortError') {
+                    showError('搜索超时，请尝试简化搜索关键词或稍后重试');
+                } else if (error.message.includes('超时')) {
+                    showError(error.message);
+                } else if (error.message.includes('网络') || error.message.includes('Failed to fetch')) {
+                    showError('网络连接失败，请检查网络连接后重试');
+                } else {
+                    showError('搜索失败: ' + error.message);
+                }
             } finally {
                 loading.style.display = 'none';
             }
+        }
+
+        function showError(message) {
+            const tbody = document.getElementById('results-body');
+            tbody.innerHTML = '';
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="7" style="text-align:center; color: #d32f2f; padding: 20px;">
+                <div style="font-size: 16px; margin-bottom: 8px;">❌ ${message}</div>
+                <div style="font-size: 14px; color: #666;">建议：尝试简化搜索关键词或稍后重试</div>
+            </td>`;
+            tbody.appendChild(tr);
         }
 
         function renderResults(results) {

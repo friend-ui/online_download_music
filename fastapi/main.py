@@ -1,6 +1,7 @@
 import sys
 import os
 import shutil
+import asyncio
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
@@ -105,7 +106,22 @@ async def search(request: SearchRequest):
             # as it won't spawn threads for other sources.
             current_client = MusicClient(music_sources=search_sources, requests_overrides=REQUESTS_OVERRIDES)
 
-        raw_results = current_client.search(keyword)
+        # Execute search with timeout to prevent blocking
+        loop = asyncio.get_event_loop()
+        
+        # Wrap the synchronous search call in a thread executor with timeout
+        try:
+            # 1 minute timeout
+            raw_results = await asyncio.wait_for(
+                loop.run_in_executor(None, current_client.search, keyword),
+                timeout=60.0  # 60 seconds timeout
+            )
+        except asyncio.TimeoutError:
+            print(f"Search timeout for keyword: {keyword}")
+            raise HTTPException(
+                status_code=408, 
+                detail="搜索超时，请尝试简化搜索关键词或稍后重试"
+            )
         
         results = []
         for src, song_infos in raw_results.items():
@@ -138,6 +154,9 @@ async def search(request: SearchRequest):
                         results.append(str(song_info))
                     
         return {"results": results}
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         print(f"Search error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
