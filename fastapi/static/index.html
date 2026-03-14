@@ -11,30 +11,47 @@
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
+            font-size: 16px; /* 增加基础字体大小，防止iOS缩放 */
         }
         h1 {
             text-align: center;
             color: #333;
+            font-size: 2rem;
+            margin-bottom: 1rem;
         }
         .search-container {
             display: flex;
             justify-content: center;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 0;
+        }
+        #source-select {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+            outline: none;
+            background: white;
+            min-width: 120px;
+            font-size: 16px; /* 防止iOS缩放 */
         }
         input[type="text"] {
-            padding: 10px;
+            padding: 12px;
             width: 300px;
             border: 1px solid #ddd;
             border-left: none;
+            border-right: none;
             outline: none;
+            font-size: 16px; /* 防止iOS缩放 */
         }
         button#search-btn {
-            padding: 10px 20px;
+            padding: 12px 20px;
             background-color: #007bff;
             color: white;
             border: none;
             border-radius: 0 4px 4px 0;
             cursor: pointer;
+            font-size: 16px; /* 防止iOS缩放 */
         }
         button#search-btn:hover {
             background-color: #0056b3;
@@ -43,11 +60,12 @@
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
+            overflow-x: auto; /* 允许水平滚动 */
         }
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 600px; /* 最小宽度确保表格内容可读 */
         }
         th.sortable {
             cursor: pointer;
@@ -70,6 +88,7 @@
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid #eee;
+            word-wrap: break-word;
         }
         th {
             background-color: #f8f9fa;
@@ -79,13 +98,14 @@
             background-color: #f1f1f1;
         }
         .download-btn {
-            padding: 6px 12px;
+            padding: 8px 16px;
             background-color: #28a745;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+            white-space: nowrap;
         }
         .download-btn:hover {
             background-color: #218838;
@@ -122,6 +142,80 @@
         .loading-text {
             font-size: 16px;
             color: #666;
+        }
+        
+        /* 移动端响应式设计 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+                font-size: 14px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .search-container {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            
+            #source-select {
+                border-radius: 4px;
+                width: 100%;
+                min-width: auto;
+            }
+            
+            input[type="text"] {
+                width: 100%;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            
+            button#search-btn {
+                border-radius: 4px;
+                width: 100%;
+            }
+            
+            #results-container {
+                border-radius: 4px;
+            }
+            
+            table {
+                font-size: 14px;
+            }
+            
+            th, td {
+                padding: 8px 4px;
+            }
+            
+            .download-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+                font-size: 12px;
+            }
+            
+            h1 {
+                font-size: 1.2rem;
+            }
+            
+            th, td {
+                padding: 6px 2px;
+                font-size: 12px;
+            }
+            
+            .download-btn {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
         }
         
         /* 下载进度条对话框 */
