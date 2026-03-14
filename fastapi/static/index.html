@@ -304,6 +304,115 @@
         .cancel-btn:hover {
             background-color: #5a6268;
         }
+        
+        /* 免责声明对话框 */
+        .disclaimer-modal {
+            display: flex;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .disclaimer-dialog {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            margin: 20px;
+        }
+        
+        .disclaimer-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #d32f2f;
+        }
+        
+        .disclaimer-content {
+            margin-bottom: 25px;
+            text-align: left;
+            line-height: 1.6;
+        }
+        
+        .disclaimer-content p {
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .disclaimer-content a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .disclaimer-content a:hover {
+            text-decoration: underline;
+        }
+        
+        .disclaimer-buttons {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .agree-btn {
+            padding: 12px 30px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+        
+        .agree-btn:hover {
+            background-color: #218838;
+        }
+        
+        /* 移动端免责声明适配 */
+        @media (max-width: 768px) {
+            .disclaimer-dialog {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .disclaimer-title {
+                font-size: 20px;
+            }
+            
+            .disclaimer-content p {
+                font-size: 14px;
+            }
+            
+            .agree-btn {
+                padding: 10px 25px;
+                font-size: 14px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .disclaimer-dialog {
+                padding: 15px;
+            }
+            
+            .disclaimer-title {
+                font-size: 18px;
+            }
+            
+            .disclaimer-content p {
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -361,6 +470,22 @@
             <div class="status-info" id="download-status">服务端正在解析歌曲数据</div>
             <div class="download-buttons">
                 <button class="cancel-btn" id="download-cancel-btn">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 免责声明对话框 -->
+    <div id="disclaimer-modal" class="disclaimer-modal">
+        <div class="disclaimer-dialog">
+            <div class="disclaimer-title">免责声明</div>
+            <div class="disclaimer-content">
+                <p>本网页仅供学习交流使用，请勿用于商业用途。</p>
+                <p>下载的音乐仅供个人学习研究，请于下载后24小时内删除。</p>
+                <p>请尊重音乐版权，支持正版音乐。</p>
+                <p>GitHub项目地址：<a href="https://github.com/friend-ui/online_download_music/tree/master" target="_blank">https://github.com/friend-ui/online_download_music/tree/master</a></p>
+            </div>
+            <div class="disclaimer-buttons">
+                <button class="agree-btn" id="agree-btn">同意并继续</button>
             </div>
         </div>
     </div>
@@ -479,7 +604,30 @@
             
             // Set initial sort state
             updateSortUI('file_size', 'asc');
+            
+            // Show disclaimer modal on page load
+            showDisclaimerModal();
         });
+        
+        // Disclaimer modal functions
+        function showDisclaimerModal() {
+            const disclaimerModal = document.getElementById('disclaimer-modal');
+            disclaimerModal.style.display = 'flex';
+            
+            // Prevent body scrolling when modal is open
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function hideDisclaimerModal() {
+            const disclaimerModal = document.getElementById('disclaimer-modal');
+            disclaimerModal.style.display = 'none';
+            
+            // Restore body scrolling
+            document.body.style.overflow = '';
+        }
+        
+        // Add event listener for agree button
+        document.getElementById('agree-btn').addEventListener('click', hideDisclaimerModal);
 
         async function search() {
             const keyword = document.getElementById('keyword').value.trim();
